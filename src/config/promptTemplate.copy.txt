@@ -1,0 +1,10 @@
+I am learning Japanese. Below is a list of vocabulary I need to reuse, plus optional topic guidance from me.
+
+Words needing reuse:
+{{WORD_LIST}}
+[[IF:TOPIC_GUIDANCE]]
+Topic guidance from me: {{TOPIC_GUIDANCE}}
+[[/IF]]
+Write a short (3-4 sentence) real-life scenario or topic in English that I could journal or text about today — picking the best-fit topic given my guidance and which words are most overdue — that would naturally require several of these words if I wrote about it in Japanese. Aim for somewhere between {{MIN_WORDS}} and {{MAX_WORDS}} of them, but use your judgement over hitting an exact number.
+Do not write any Japanese. Do not write example sentences using the words yourself — just describe the situation.
+End with one line noting which words the scenario naturally invites.

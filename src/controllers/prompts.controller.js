@@ -4,37 +4,78 @@ const PromptGuidance = require('../models/PromptGuidance');
 const aiService = require('../services/aiService');
 const { isDue, sortByPriorityThenNeglect } = require('../utils/dueLogic');
 
+const DEFAULT_MIN_WORDS = 3;
+const DEFAULT_MAX_WORDS = 7;
+// Sanity cap on how many due words get sent to the AI-in-app mode — the AI narrows
+// from this list itself (that's the "compatibility" selection), so it's deliberately
+// looser than the copy-paste mode's hard maxWords slice.
+const AI_MODE_CANDIDATE_CAP = 30;
+
 // POST /api/prompts/generate
-// Does NOT save anything by itself — it hands back either:
-//   - a live AI-generated prompt (generatedBy: 'ai'), once aiService is implemented, or
-//   - a pastable meta-prompt template (generatedBy: 'manual-template') that works today.
-// The frontend then calls POST /api/prompts to persist whichever content the user ends up with.
+//   { mode: 'ai' | 'template', minWords, maxWords, excludedWordIds, includedWordIds, topicRequest }
+// Does NOT save anything by itself — it hands back one of:
+//   - mode 'ai'       -> a live AI-generated prompt (generatedBy: 'ai'). Currently
+//                        throws 501 — aiService.generatePromptWithAI is a stub until
+//                        a provider is wired up (bring-your-own-AI, still being designed).
+//   - mode 'template' -> a pastable meta-prompt (generatedBy: 'manual-template') that
+//                        works today, built from the words THIS endpoint already picked.
+// The frontend then calls POST /api/prompts to persist whichever content the user ends
+// up with — including a third path, 'pasted', for a prompt the user wrote/sourced
+// entirely themselves and never touches this endpoint at all.
+//
+// includedWordIds lets the user manually pull in words the SRS logic doesn't
+// consider due yet (the Generate Prompt screen's "include anyway" picker,
+// populated from GET /api/words?dueOnly=false) — it's a pure addition to the
+// due set, not a replacement of it. excludedWordIds still wins if a word
+// somehow ends up in both lists.
 exports.generateTodayPrompt = async (req, res, next) => {
   try {
+    const {
+      mode = 'template',
+      minWords = DEFAULT_MIN_WORDS,
+      maxWords = DEFAULT_MAX_WORDS,
+      excludedWordIds = [],
+      includedWordIds = [],
+      topicRequest = '',
+    } = req.body || {};
+
+    const excluded = new Set(excludedWordIds.map(String));
+    const included = new Set(includedWordIds.map(String));
     const words = await Word.find();
-    const dueWords = sortByPriorityThenNeglect(words.filter(isDue)).slice(0, 7);
+    const dueWords = sortByPriorityThenNeglect(
+      words
+        .filter((w) => isDue(w) || included.has(String(w._id)))
+        .filter((w) => !excluded.has(String(w._id)))
+    );
 
     const pendingGuidance = await PromptGuidance.find({ used: false });
     const guidanceNotes = pendingGuidance.map((g) => g.note);
+    const topicGuidance = [...guidanceNotes, topicRequest].filter(Boolean).join('; ');
 
     let content;
     let generatedBy;
+    let targetWordIds;
 
-    if (aiService.hasApiKey()) {
-      content = await aiService.generatePromptWithAI(dueWords, guidanceNotes); // throws 501 until implemented
+    if (mode === 'ai') {
+      const candidates = dueWords.slice(0, AI_MODE_CANDIDATE_CAP);
+      // Throws 501 until a provider is wired up — see aiService.js.
+      content = await aiService.generatePromptWithAI(candidates, topicGuidance, { minWords, maxWords });
       generatedBy = 'ai';
+      targetWordIds = []; // will come from parsing the AI's reply once this is implemented
     } else {
-      content = aiService.generateMetaPrompt(dueWords, guidanceNotes);
+      const candidates = dueWords.slice(0, maxWords);
+      content = await aiService.generateMetaPrompt(candidates, topicGuidance, { minWords, maxWords });
       generatedBy = 'manual-template';
+      targetWordIds = candidates.map((w) => w._id);
     }
 
     res.json({
       generatedBy,
       content,
-      targetWordIds: dueWords.map((w) => w._id),
+      targetWordIds,
       guidanceUsed: guidanceNotes,
       ...(generatedBy === 'manual-template' && {
-        note: 'No AI key configured — paste this into Claude (or any model) yourself, then POST the result to /api/prompts to save it.',
+        note: 'Paste this into Claude (or any model) yourself, then POST the result to /api/prompts to save it.',
       }),
     });
   } catch (err) {

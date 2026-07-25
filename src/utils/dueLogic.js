@@ -7,9 +7,13 @@ function daysSince(date) {
 }
 
 // Priority flag is a manual override — if set, the word is due no matter what.
+// srsIntervalDays / srsUseCountTarget let a word override the global thresholds
+// (e.g. nudge this one every 7 days instead of 3) — null/unset falls back to the default.
 function isDue(word) {
   if (word.priority) return true;
-  return word.useCount < NEGLECT_USE_COUNT_THRESHOLD && daysSince(word.lastUsed) > NEGLECT_DAYS_THRESHOLD;
+  const useCountThreshold = word.srsUseCountTarget ?? NEGLECT_USE_COUNT_THRESHOLD;
+  const daysThreshold = word.srsIntervalDays ?? NEGLECT_DAYS_THRESHOLD;
+  return word.useCount < useCountThreshold && daysSince(word.lastUsed) > daysThreshold;
 }
 
 // Priority words first, then least-used, then longest-neglected.

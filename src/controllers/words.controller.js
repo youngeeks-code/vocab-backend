@@ -1,11 +1,17 @@
 const Word = require('../models/Word');
 const { isDue, sortByPriorityThenNeglect } = require('../utils/dueLogic');
 
-// GET /api/words?dueOnly=true
+// GET /api/words                 -> everything
+// GET /api/words?dueOnly=true     -> only due words
+// GET /api/words?dueOnly=false    -> only NOT-due words (e.g. the Generate
+//                                    Prompt screen's "include anyway" picker,
+//                                    for overriding SRS due-ness manually)
 exports.listWords = async (req, res, next) => {
   try {
     const words = await Word.find();
-    const filtered = req.query.dueOnly === 'true' ? words.filter(isDue) : words;
+    let filtered = words;
+    if (req.query.dueOnly === 'true') filtered = words.filter(isDue);
+    else if (req.query.dueOnly === 'false') filtered = words.filter((w) => !isDue(w));
     res.json(sortByPriorityThenNeglect(filtered));
   } catch (err) {
     next(err);
@@ -28,7 +34,17 @@ exports.getWord = async (req, res, next) => {
 // plus optionally the full candidate list so they can re-pick later without re-searching.
 exports.createWord = async (req, res, next) => {
   try {
-    const { word, reading, definition, candidateDefinitions, tags, notes, priority } = req.body;
+    const {
+      word,
+      reading,
+      definition,
+      candidateDefinitions,
+      tags,
+      notes,
+      priority,
+      srsIntervalDays,
+      srsUseCountTarget,
+    } = req.body;
     if (!word) return res.status(400).json({ error: 'word is required' });
 
     const created = await Word.create({
@@ -39,6 +55,8 @@ exports.createWord = async (req, res, next) => {
       tags,
       notes,
       priority: Boolean(priority),
+      srsIntervalDays,
+      srsUseCountTarget,
     });
     res.status(201).json(created);
   } catch (err) {
@@ -50,7 +68,7 @@ exports.createWord = async (req, res, next) => {
 // General edit — definition swap, notes, tags, priority toggle, reading fix, etc.
 exports.updateWord = async (req, res, next) => {
   try {
-    const updates = (({ word, reading, definition, candidateDefinitions, tags, notes, priority }) => ({
+    const updates = (({
       word,
       reading,
       definition,
@@ -58,6 +76,18 @@ exports.updateWord = async (req, res, next) => {
       tags,
       notes,
       priority,
+      srsIntervalDays,
+      srsUseCountTarget,
+    }) => ({
+      word,
+      reading,
+      definition,
+      candidateDefinitions,
+      tags,
+      notes,
+      priority,
+      srsIntervalDays,
+      srsUseCountTarget,
     }))(req.body);
 
     // Drop undefined keys so a partial PATCH doesn't null out untouched fields.

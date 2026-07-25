@@ -38,6 +38,12 @@ const wordSchema = new mongoose.Schema({
   // Manual override — beats the neglect-based due logic entirely.
   priority: { type: Boolean, default: false },
 
+  // Per-word overrides of the global neglect thresholds (dueLogic.js) — leave
+  // null to use the app-wide defaults. e.g. a word you want nudged more often
+  // gets a smaller srsIntervalDays than the global default.
+  srsIntervalDays: { type: Number, default: null },
+  srsUseCountTarget: { type: Number, default: null },
+
   useCount: { type: Number, default: 0 },
   lastUsed: { type: Date, default: null },
 
