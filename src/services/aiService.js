@@ -3,16 +3,29 @@ const AiSettings = require('../models/AiSettings');
 const PromptTemplate = require('../models/PromptTemplate');
 const { renderTemplate } = require('../utils/promptTemplate');
 
-const DEFAULT_MODEL = 'claude-opus-5';
+const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 
-// DB-stored key (set via PUT /api/ai-settings) wins; falls back to the
-// ANTHROPIC_API_KEY env var so a fresh deploy works before anyone's touched
-// the settings UI. Neither set -> AI mode is simply unavailable.
+// DB-stored settings (set via PUT /api/ai-settings) win; the Anthropic key
+// falls back to the ANTHROPIC_API_KEY env var so a fresh deploy works before
+// anyone's touched the settings UI. activeProvider picks which credentials
+// actually get used — a provider's key can be stored ahead of switching to it.
 async function getEffectiveSettings() {
   const stored = await AiSettings.findOne();
+  const activeProvider = stored?.activeProvider || 'anthropic';
+
+  if (activeProvider === 'gemini') {
+    return {
+      provider: 'gemini',
+      apiKey: stored?.geminiApiKey || process.env.GEMINI_API_KEY || null,
+      model: stored?.geminiModel || DEFAULT_GEMINI_MODEL,
+    };
+  }
+
   return {
-    apiKey: stored?.apiKey || process.env.ANTHROPIC_API_KEY || null,
-    model: stored?.model || DEFAULT_MODEL,
+    provider: 'anthropic',
+    apiKey: stored?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null,
+    model: stored?.anthropicModel || DEFAULT_ANTHROPIC_MODEL,
   };
 }
 
@@ -52,10 +65,10 @@ function formatWordListForCopy(words) {
 // see AiSettings / /api/ai-settings) with the rendered "ai" template, then
 // parses the reply via parseAiResponse().
 async function generatePromptWithAI(dueWords, topicGuidance, { minWords, maxWords } = {}) {
-  const { apiKey, model } = await getEffectiveSettings();
+  const { provider, apiKey, model } = await getEffectiveSettings();
   if (!apiKey) {
     const err = new Error(
-      'No AI API key configured. Add one via PUT /api/ai-settings, or use mode "template" instead.'
+      `No ${provider} API key configured. Add one via PUT /api/ai-settings, or use mode "template" instead.`
     );
     err.status = 400;
     throw err;
@@ -69,6 +82,15 @@ async function generatePromptWithAI(dueWords, topicGuidance, { minWords, maxWord
     TOPIC_GUIDANCE: topicGuidance,
   });
 
+  const rawText =
+    provider === 'gemini'
+      ? await callGemini(apiKey, model, renderedPrompt)
+      : await callAnthropic(apiKey, model, renderedPrompt);
+
+  return parseAiResponse(rawText);
+}
+
+async function callAnthropic(apiKey, model, renderedPrompt) {
   const client = new Anthropic({ apiKey });
 
   let response;
@@ -99,7 +121,18 @@ async function generatePromptWithAI(dueWords, topicGuidance, { minWords, maxWord
     throw err;
   }
 
-  return parseAiResponse(textBlock.text);
+  return textBlock.text;
+}
+
+// PLACEHOLDER — a Gemini key can be stored via /api/ai-settings ahead of
+// time, but the actual call isn't wired up yet. Swap this out for a real
+// call to Google's Gemini API when that's needed.
+async function callGemini() {
+  const err = new Error(
+    'Gemini generation not implemented yet. Switch activeProvider to "anthropic", or wire up the Gemini call in aiService.js.'
+  );
+  err.status = 501;
+  throw err;
 }
 
 // WORKS TODAY, no API key required.

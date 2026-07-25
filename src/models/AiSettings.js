@@ -1,12 +1,19 @@
 const mongoose = require('mongoose');
 
-// Singleton document — there is only ever one of these per deployment.
-// Bring-your-own-key: whoever runs this instance pastes their own Anthropic
-// API key in here (via /api/ai-settings), so no key is baked into the app.
+// Singleton document. Credentials for multiple providers can be stored
+// independently — a key can be added ahead of using it — while
+// activeProvider decides which one generatePromptWithAI actually calls.
 const aiSettingsSchema = new mongoose.Schema({
-  provider: { type: String, default: 'anthropic' },
-  apiKey: { type: String, default: null },
-  model: { type: String, default: 'claude-opus-5' },
+  activeProvider: { type: String, enum: ['anthropic', 'gemini'], default: 'anthropic' },
+
+  anthropicApiKey: { type: String, default: null },
+  anthropicModel: { type: String, default: 'claude-opus-5' },
+
+  // Gemini key can be stored now for later — live calling isn't wired up
+  // yet (see aiService.js), only Anthropic is implemented so far.
+  geminiApiKey: { type: String, default: null },
+  geminiModel: { type: String, default: 'gemini-2.5-pro' },
+
   updatedAt: { type: Date, default: Date.now },
 });
 
