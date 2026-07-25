@@ -10,9 +10,11 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 // falls back to the ANTHROPIC_API_KEY env var so a fresh deploy works before
 // anyone's touched the settings UI. activeProvider picks which credentials
 // actually get used — a provider's key can be stored ahead of switching to it.
-async function getEffectiveSettings() {
+// providerOverride (from a single /api/prompts/generate call) wins over the
+// persisted activeProvider without changing what's stored.
+async function getEffectiveSettings(providerOverride) {
   const stored = await AiSettings.findOne();
-  const activeProvider = stored?.activeProvider || 'anthropic';
+  const activeProvider = providerOverride || stored?.activeProvider || 'anthropic';
 
   if (activeProvider === 'gemini') {
     return {
@@ -29,8 +31,8 @@ async function getEffectiveSettings() {
   };
 }
 
-async function hasApiKey() {
-  const { apiKey } = await getEffectiveSettings();
+async function hasApiKey(providerOverride) {
+  const { apiKey } = await getEffectiveSettings(providerOverride);
   return Boolean(apiKey);
 }
 
@@ -64,8 +66,8 @@ function formatWordListForCopy(words) {
 // Calls whichever model the deployment has configured (bring-your-own-key —
 // see AiSettings / /api/ai-settings) with the rendered "ai" template, then
 // parses the reply via parseAiResponse().
-async function generatePromptWithAI(dueWords, topicGuidance, { minWords, maxWords } = {}) {
-  const { provider, apiKey, model } = await getEffectiveSettings();
+async function generatePromptWithAI(dueWords, topicGuidance, { minWords, maxWords, provider: providerOverride } = {}) {
+  const { provider, apiKey, model } = await getEffectiveSettings(providerOverride);
   if (!apiKey) {
     const err = new Error(
       `No ${provider} API key configured. Add one via PUT /api/ai-settings, or use mode "template" instead.`
@@ -172,4 +174,11 @@ function parseAiResponse(rawText) {
   return { content, targetWordIds };
 }
 
-module.exports = { hasApiKey, generatePromptWithAI, generateMetaPrompt, parseAiResponse };
+module.exports = {
+  hasApiKey,
+  generatePromptWithAI,
+  generateMetaPrompt,
+  parseAiResponse,
+  formatWordListForAI,
+  formatWordListForCopy,
+};

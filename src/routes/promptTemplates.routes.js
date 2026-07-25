@@ -6,6 +6,7 @@ const ctrl = require('../controllers/promptTemplates.controller');
 router.get('/:type/active', ctrl.getActive);
 router.get('/:type/:id', ctrl.getVersion);
 router.get('/:type', ctrl.listVersions);
+router.post('/:type/preview', ctrl.previewTemplate);
 router.post('/:type', ctrl.saveNewVersion);
 router.patch('/:type/:id/activate', ctrl.activateVersion);
 

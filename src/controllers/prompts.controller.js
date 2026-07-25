@@ -12,7 +12,7 @@ const DEFAULT_MAX_WORDS = 7;
 const AI_MODE_CANDIDATE_CAP = 30;
 
 // POST /api/prompts/generate
-//   { mode: 'ai' | 'template', minWords, maxWords, excludedWordIds, includedWordIds, topicRequest }
+//   { mode: 'ai' | 'template', minWords, maxWords, excludedWordIds, includedWordIds, topicRequest, provider }
 // Does NOT save anything by itself — it hands back one of:
 //   - mode 'ai'       -> a live AI-generated prompt (generatedBy: 'ai'), calling
 //                        whichever provider/model is configured via
@@ -29,6 +29,9 @@ const AI_MODE_CANDIDATE_CAP = 30;
 // populated from GET /api/words?dueOnly=false) — it's a pure addition to the
 // due set, not a replacement of it. excludedWordIds still wins if a word
 // somehow ends up in both lists.
+//
+// provider (mode 'ai' only) — optional 'anthropic' | 'gemini' override for
+// just this one call, without changing the persisted AiSettings.activeProvider.
 exports.generateTodayPrompt = async (req, res, next) => {
   try {
     const {
@@ -38,7 +41,12 @@ exports.generateTodayPrompt = async (req, res, next) => {
       excludedWordIds = [],
       includedWordIds = [],
       topicRequest = '',
+      provider,
     } = req.body || {};
+
+    if (provider !== undefined && !['anthropic', 'gemini'].includes(provider)) {
+      return res.status(400).json({ error: 'provider must be "anthropic" or "gemini"' });
+    }
 
     const excluded = new Set(excludedWordIds.map(String));
     const included = new Set(includedWordIds.map(String));
@@ -59,7 +67,7 @@ exports.generateTodayPrompt = async (req, res, next) => {
 
     if (mode === 'ai') {
       const candidates = dueWords.slice(0, AI_MODE_CANDIDATE_CAP);
-      const result = await aiService.generatePromptWithAI(candidates, topicGuidance, { minWords, maxWords });
+      const result = await aiService.generatePromptWithAI(candidates, topicGuidance, { minWords, maxWords, provider });
       content = result.content;
       targetWordIds = result.targetWordIds;
       generatedBy = 'ai';
