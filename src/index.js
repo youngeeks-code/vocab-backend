@@ -20,6 +20,21 @@ app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Serves the built frontend (populated by the Docker build's frontend-build
+// stage; absent in plain `npm run dev`, where Vite's own dev server is used
+// instead, proxying /api and /uploads to this backend). Kept ahead of the
+// auth gate: a plain browser navigation/refresh can't attach the
+// X-App-Password header, so the HTML/JS/CSS shell itself must load
+// unauthenticated — the SPA prompts for the password client-side, then
+// attaches it to every subsequent /api call.
+const publicDir = path.join(__dirname, '..', 'public');
+app.use(express.static(publicDir));
+app.get(/^(?!\/api|\/uploads).*/, (req, res, next) => {
+  res.sendFile(path.join(publicDir, 'index.html'), (err) => {
+    if (err) next();
+  });
+});
+
 app.use(auth);
 
 // Served after auth so uploaded images are gated the same as the API once APP_PASSWORD is set.
