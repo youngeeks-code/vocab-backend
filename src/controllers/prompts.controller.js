@@ -14,9 +14,10 @@ const AI_MODE_CANDIDATE_CAP = 30;
 // POST /api/prompts/generate
 //   { mode: 'ai' | 'template', minWords, maxWords, excludedWordIds, includedWordIds, topicRequest }
 // Does NOT save anything by itself — it hands back one of:
-//   - mode 'ai'       -> a live AI-generated prompt (generatedBy: 'ai'). Currently
-//                        throws 501 — aiService.generatePromptWithAI is a stub until
-//                        a provider is wired up (bring-your-own-AI, still being designed).
+//   - mode 'ai'       -> a live AI-generated prompt (generatedBy: 'ai'), calling
+//                        whichever provider/model is configured via
+//                        /api/ai-settings (bring-your-own-key). Throws 400 if
+//                        no key is configured — use mode 'template' instead.
 //   - mode 'template' -> a pastable meta-prompt (generatedBy: 'manual-template') that
 //                        works today, built from the words THIS endpoint already picked.
 // The frontend then calls POST /api/prompts to persist whichever content the user ends
@@ -58,10 +59,10 @@ exports.generateTodayPrompt = async (req, res, next) => {
 
     if (mode === 'ai') {
       const candidates = dueWords.slice(0, AI_MODE_CANDIDATE_CAP);
-      // Throws 501 until a provider is wired up — see aiService.js.
-      content = await aiService.generatePromptWithAI(candidates, topicGuidance, { minWords, maxWords });
+      const result = await aiService.generatePromptWithAI(candidates, topicGuidance, { minWords, maxWords });
+      content = result.content;
+      targetWordIds = result.targetWordIds;
       generatedBy = 'ai';
-      targetWordIds = []; // will come from parsing the AI's reply once this is implemented
     } else {
       const candidates = dueWords.slice(0, maxWords);
       content = await aiService.generateMetaPrompt(candidates, topicGuidance, { minWords, maxWords });

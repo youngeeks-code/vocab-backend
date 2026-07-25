@@ -12,6 +12,7 @@ const wordsRoutes = require('./routes/words.routes');
 const dictionaryRoutes = require('./routes/dictionary.routes');
 const promptsRoutes = require('./routes/prompts.routes');
 const promptTemplatesRoutes = require('./routes/promptTemplates.routes');
+const aiSettingsRoutes = require('./routes/aiSettings.routes');
 
 const app = express();
 app.use(cors());
@@ -28,6 +29,7 @@ app.use('/api/words', wordsRoutes);
 app.use('/api/dictionary', dictionaryRoutes);
 app.use('/api/prompts', promptsRoutes);
 app.use('/api/prompt-templates', promptTemplatesRoutes);
+app.use('/api/ai-settings', aiSettingsRoutes);
 
 app.use(errorHandler);
 

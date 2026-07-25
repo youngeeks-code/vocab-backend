@@ -1,5 +1,25 @@
+const Anthropic = require('@anthropic-ai/sdk');
+const AiSettings = require('../models/AiSettings');
 const PromptTemplate = require('../models/PromptTemplate');
 const { renderTemplate } = require('../utils/promptTemplate');
+
+const DEFAULT_MODEL = 'claude-opus-5';
+
+// DB-stored key (set via PUT /api/ai-settings) wins; falls back to the
+// ANTHROPIC_API_KEY env var so a fresh deploy works before anyone's touched
+// the settings UI. Neither set -> AI mode is simply unavailable.
+async function getEffectiveSettings() {
+  const stored = await AiSettings.findOne();
+  return {
+    apiKey: stored?.apiKey || process.env.ANTHROPIC_API_KEY || null,
+    model: stored?.model || DEFAULT_MODEL,
+  };
+}
+
+async function hasApiKey() {
+  const { apiKey } = await getEffectiveSettings();
+  return Boolean(apiKey);
+}
 
 async function getActiveTemplateContent(type) {
   const template = await PromptTemplate.findOne({ type, active: true });
@@ -9,10 +29,6 @@ async function getActiveTemplateContent(type) {
     throw err;
   }
   return template.content;
-}
-
-function hasApiKey() {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
 function formatWordListForAI(words) {
@@ -32,11 +48,19 @@ function formatWordListForCopy(words) {
     .join('\n');
 }
 
-// PLACEHOLDER — once a provider is chosen (bring-your-own-AI), call it here with
-// `renderedPrompt` and feed the raw text reply into parseAiResponse() below.
-// dueWords: candidate Word docs (priority/neglect sorted, exclusions already applied)
-// topicGuidance: combined guidance-queue + ad-hoc topic text, may be ''
+// Calls whichever model the deployment has configured (bring-your-own-key —
+// see AiSettings / /api/ai-settings) with the rendered "ai" template, then
+// parses the reply via parseAiResponse().
 async function generatePromptWithAI(dueWords, topicGuidance, { minWords, maxWords } = {}) {
+  const { apiKey, model } = await getEffectiveSettings();
+  if (!apiKey) {
+    const err = new Error(
+      'No AI API key configured. Add one via PUT /api/ai-settings, or use mode "template" instead.'
+    );
+    err.status = 400;
+    throw err;
+  }
+
   const template = await getActiveTemplateContent('ai');
   const renderedPrompt = renderTemplate(template, {
     WORD_LIST: formatWordListForAI(dueWords),
@@ -45,13 +69,37 @@ async function generatePromptWithAI(dueWords, topicGuidance, { minWords, maxWord
     TOPIC_GUIDANCE: topicGuidance,
   });
 
-  const err = new Error(
-    'Live AI prompt generation not implemented yet. Wire services/aiService.js up to send ' +
-    '`renderedPrompt` to your chosen provider, then parse the reply with parseAiResponse().'
-  );
-  err.status = 501;
-  err.renderedPrompt = renderedPrompt; // kept on the error for debugging/inspection until this is wired up
-  throw err;
+  const client = new Anthropic({ apiKey });
+
+  let response;
+  try {
+    response = await client.messages.create({
+      model,
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: renderedPrompt }],
+    });
+  } catch (sdkErr) {
+    const err = new Error(`AI provider request failed: ${sdkErr.message}`);
+    err.status = sdkErr.status || 502;
+    throw err;
+  }
+
+  // Claude's safety classifiers can decline a request outright — a normal
+  // 200 response with no usable content rather than a thrown error.
+  if (response.stop_reason === 'refusal') {
+    const err = new Error('The AI declined to generate a prompt for this request.');
+    err.status = 502;
+    throw err;
+  }
+
+  const textBlock = response.content.find((b) => b.type === 'text');
+  if (!textBlock) {
+    const err = new Error('AI response contained no text content.');
+    err.status = 502;
+    throw err;
+  }
+
+  return parseAiResponse(textBlock.text);
 }
 
 // WORKS TODAY, no API key required.
@@ -72,8 +120,6 @@ async function generateMetaPrompt(dueWords, topicGuidance, { minWords, maxWords 
 //   <scenario text, one or more lines>
 //   IDS
 //   <one word ID per line, section may be empty>
-// Not called anywhere yet — this is the seam a real provider call will use
-// once one exists, kept here (and tested) so that wiring is a small change.
 function parseAiResponse(rawText) {
   const lines = rawText.replace(/\r\n/g, '\n').split('\n');
   const isMarker = (line, name) => line.trim().replace(/:$/, '') === name;
