@@ -2,15 +2,21 @@ const Response = require('../models/Response');
 const Prompt = require('../models/Prompt');
 
 // POST /api/prompts/:id/response
-// type: 'text'  -> content is the text blob itself
-// type: 'image' -> content is a file path/URL (actual upload handling is a placeholder,
-//                  see middleware/upload.js for the multer stub)
+// type: 'text'  -> JSON body, content is the text blob itself
+// type: 'image' -> multipart/form-data with the file under field name "image";
+//                  content is derived from the stored file, not sent by the caller
 exports.attachResponse = async (req, res, next) => {
   try {
     const prompt = await Prompt.findById(req.params.id);
     if (!prompt) return res.status(404).json({ error: 'Prompt not found' });
 
-    const { type, content } = req.body;
+    let { type, content } = req.body;
+
+    if (req.file) {
+      type = 'image';
+      content = `/uploads/${req.file.filename}`;
+    }
+
     if (!type || !content) return res.status(400).json({ error: 'type and content are required' });
 
     const response = await Response.create({ promptId: prompt._id, type, content });

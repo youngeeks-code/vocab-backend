@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 
@@ -17,6 +18,9 @@ app.use(express.json());
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use(auth);
+
+// Served after auth so uploaded images are gated the same as the API once APP_PASSWORD is set.
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.use('/api/words', wordsRoutes);
 app.use('/api/dictionary', dictionaryRoutes);
