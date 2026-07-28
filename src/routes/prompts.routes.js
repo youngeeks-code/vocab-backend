@@ -11,7 +11,7 @@ router.get('/', ctrl.listPrompts);
 router.post('/', ctrl.savePrompt);
 router.get('/:id', ctrl.getPrompt);
 
-router.post('/:id/response', upload.single('image'), responsesCtrl.attachResponse);
+router.post('/:id/response', upload.array('images', 10), responsesCtrl.attachResponse);
 router.get('/:id/response', responsesCtrl.getResponses);
 
 module.exports = router;

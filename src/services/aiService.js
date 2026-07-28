@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenAI } = require('@google/genai');
 const AiSettings = require('../models/AiSettings');
 const PromptTemplate = require('../models/PromptTemplate');
 const { renderTemplate } = require('../utils/promptTemplate');
@@ -126,15 +127,41 @@ async function callAnthropic(apiKey, model, renderedPrompt) {
   return textBlock.text;
 }
 
-// PLACEHOLDER — a Gemini key can be stored via /api/ai-settings ahead of
-// time, but the actual call isn't wired up yet. Swap this out for a real
-// call to Google's Gemini API when that's needed.
-async function callGemini() {
-  const err = new Error(
-    'Gemini generation not implemented yet. Switch activeProvider to "anthropic", or wire up the Gemini call in aiService.js.'
-  );
-  err.status = 501;
-  throw err;
+async function callGemini(apiKey, model, renderedPrompt) {
+  const client = new GoogleGenAI({ apiKey });
+
+  let response;
+  try {
+    response = await client.models.generateContent({
+      model,
+      contents: renderedPrompt,
+    });
+  } catch (sdkErr) {
+    const err = new Error(`AI provider request failed: ${sdkErr.message}`);
+    err.status = sdkErr.status || 502;
+    throw err;
+  }
+
+  // Gemini's safety filters can block a prompt/response outright rather than
+  // throwing — surfaced via promptFeedback.blockReason or a non-STOP finishReason.
+  const blockReason = response.promptFeedback?.blockReason;
+  const finishReason = response.candidates?.[0]?.finishReason;
+  if (blockReason || (finishReason && finishReason !== 'STOP')) {
+    const err = new Error(
+      `The AI declined to generate a prompt for this request (${blockReason || finishReason}).`
+    );
+    err.status = 502;
+    throw err;
+  }
+
+  const text = response.text;
+  if (!text) {
+    const err = new Error('AI response contained no text content.');
+    err.status = 502;
+    throw err;
+  }
+
+  return text;
 }
 
 // WORKS TODAY, no API key required.

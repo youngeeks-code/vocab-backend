@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { label: 'Add Word', href: '/words/add', shape: '6px', iconColor: colors.gold, match: (p) => p === '/words/add' },
   { label: 'Generate Prompt', href: '/generate', shape: '50%', iconColor: colors.accent, match: (p) => p === '/generate' },
   {
-    label: 'History',
+    label: 'Journal',
     href: '/history',
     shape: '4px',
     iconColor: colors.textMuted,

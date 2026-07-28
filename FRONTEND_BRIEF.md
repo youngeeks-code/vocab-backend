@@ -94,14 +94,13 @@ Only one `active: true` per `type` at any time, enforced at the DB level. Saving
       model: string,              // default "claude-opus-5"
       hasApiKey: boolean,
       apiKeySource: 'settings' | 'env' | null,
-      apiKeyPreview: string | null,   // e.g. "sk-ant-...bQAA" — never the raw key
+      // No apiKeyPreview — a stored key is never sent back to the client in
+      // any form, not even truncated. hasApiKey/apiKeySource is the only signal.
     },
     gemini: {
       model: string,              // default "gemini-2.5-pro"
       hasApiKey: boolean,
       apiKeySource: 'settings' | null,
-      apiKeyPreview: string | null,
-      note: string,                // "Key can be stored now; live Gemini calls are not wired up yet."
     },
   },
 }
@@ -262,9 +261,8 @@ Side effect: any note text present in `guidanceUsed` gets marked `used:true` in 
 
 ### 9. AI Settings
 - Provider selector: Anthropic / Gemini (`activeProvider`)
-- Per-provider block: model field, API key field (password-masked input), show `apiKeyPreview` + `apiKeySource`
-- Gemini block clearly labeled per its `note` field — storable now, not functional yet
-- Save → `PUT /api/ai-settings`; clear a key by sending `apiKey: ''`
+- Per-provider block: model field, API key field (password-masked input, always blank — never pre-filled from the server), show `hasApiKey` + `apiKeySource` as a status line only (e.g. "Key set via settings.")
+- Save → `PUT /api/ai-settings`; clear a key by sending `apiKey: ''`; both providers are fully wired up
 
 ### 10. (Inert today) App password gate
 Only matters once `APP_PASSWORD` is set server-side. One-time password prompt, store in `localStorage`, attach as `X-App-Password` on every request thereafter.

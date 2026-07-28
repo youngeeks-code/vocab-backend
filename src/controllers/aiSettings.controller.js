@@ -1,11 +1,8 @@
 const AiSettings = require('../models/AiSettings');
 
-// Never return the raw key — just enough to confirm one is set.
-function maskKey(key) {
-  if (!key) return null;
-  return key.length <= 8 ? '••••' : `${key.slice(0, 7)}...${key.slice(-4)}`;
-}
-
+// No part of a real key is ever sent back to the client — hasApiKey/apiKeySource
+// are the only signal the UI gets, so a saved key can never be read back out
+// through this endpoint (only replaced or cleared).
 function buildResponse(stored) {
   const envAnthropicKey = Boolean(process.env.ANTHROPIC_API_KEY);
   return {
@@ -15,14 +12,11 @@ function buildResponse(stored) {
         model: stored?.anthropicModel || 'claude-opus-5',
         hasApiKey: Boolean(stored?.anthropicApiKey) || envAnthropicKey,
         apiKeySource: stored?.anthropicApiKey ? 'settings' : envAnthropicKey ? 'env' : null,
-        apiKeyPreview: maskKey(stored?.anthropicApiKey),
       },
       gemini: {
         model: stored?.geminiModel || 'gemini-2.5-pro',
         hasApiKey: Boolean(stored?.geminiApiKey),
         apiKeySource: stored?.geminiApiKey ? 'settings' : null,
-        apiKeyPreview: maskKey(stored?.geminiApiKey),
-        note: 'Key can be stored now; live Gemini calls are not wired up yet.',
       },
     },
   };

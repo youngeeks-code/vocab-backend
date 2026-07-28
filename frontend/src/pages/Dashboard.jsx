@@ -4,6 +4,23 @@ import PageShell from '../components/PageShell';
 import { api } from '../api/client';
 import { colors, headingStyle, card, badge } from '../theme';
 
+// Consecutive days with a saved prompt, counting back from today — but if
+// today has no entry yet, count back from yesterday instead so an
+// in-progress day doesn't reset the streak to 0 before you've had a chance to write.
+function computeStreak(prompts) {
+  const dates = new Set(prompts.map((p) => p.date));
+  const cursor = new Date();
+  const todayIso = cursor.toISOString().slice(0, 10);
+  if (!dates.has(todayIso)) cursor.setDate(cursor.getDate() - 1);
+
+  let streak = 0;
+  while (dates.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 function neglectInfo(word) {
   if (word.priority) return { label: 'Priority', bg: colors.errorBg, fg: colors.accent };
   if (!word.lastUsed) return { label: 'never used', bg: colors.errorBg, fg: colors.errorText };
@@ -16,6 +33,7 @@ function neglectInfo(word) {
 export default function Dashboard() {
   const [dueWords, setDueWords] = useState([]);
   const [recentPrompts, setRecentPrompts] = useState([]);
+  const [streak, setStreak] = useState(0);
   const [guidance, setGuidance] = useState([]);
   const [aiStatus, setAiStatus] = useState(null);
   const [error, setError] = useState('');
@@ -31,6 +49,7 @@ export default function Dashboard() {
         ]);
         setDueWords(words);
         setRecentPrompts(prompts.slice(0, 3));
+        setStreak(computeStreak(prompts));
         setGuidance(guidanceNotes);
         setAiStatus(aiSettings);
       } catch (err) {
@@ -55,11 +74,19 @@ export default function Dashboard() {
           <div style={{ ...headingStyle, fontSize: 28 }}>Good day 🍡</div>
           <div style={{ color: colors.textMuted, fontSize: 14.5, marginTop: 4 }}>Here's what's ripe for review today.</div>
         </div>
-        {aiStatus && (
-          <div style={badge(colors.sageBg, colors.sageText)}>
-            {aiStatus.providers[aiStatus.activeProvider]?.hasApiKey ? 'AI ready' : 'No AI key configured'}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {streak > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: colors.sageBg, border: `1px solid ${colors.sageBorder}`, color: colors.sageText, padding: '8px 16px', borderRadius: 999, fontWeight: 600, fontSize: 14 }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: colors.sageDot, display: 'inline-block' }} />
+              {streak} day streak
+            </div>
+          )}
+          {aiStatus && (
+            <div style={badge(colors.sageBg, colors.sageText)}>
+              {aiStatus.providers[aiStatus.activeProvider]?.hasApiKey ? 'AI ready' : 'No AI key configured'}
+            </div>
+          )}
+        </div>
       </div>
 
       {error && <div style={{ ...card, borderColor: colors.errorBorder, color: colors.errorText, marginBottom: 20 }}>{error}</div>}

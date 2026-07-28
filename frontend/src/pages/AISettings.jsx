@@ -74,9 +74,6 @@ export default function AISettings() {
       setModel: setAnthropicModel,
       keyInput: anthropicKeyInput,
       setKeyInput: setAnthropicKeyInput,
-      hasNote: false,
-      note: '',
-      preview: settings.providers.anthropic.apiKeyPreview,
       hasKey: settings.providers.anthropic.hasApiKey,
       source: settings.providers.anthropic.apiKeySource,
     },
@@ -87,9 +84,6 @@ export default function AISettings() {
       setModel: setGeminiModel,
       keyInput: geminiKeyInput,
       setKeyInput: setGeminiKeyInput,
-      hasNote: true,
-      note: settings.providers.gemini.note,
-      preview: settings.providers.gemini.apiKeyPreview,
       hasKey: settings.providers.gemini.hasApiKey,
       source: settings.providers.gemini.apiKeySource,
     },
@@ -113,10 +107,6 @@ export default function AISettings() {
               {activeProvider === p.key && <span style={{ background: colors.sageBg, color: colors.sageText, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>active</span>}
             </div>
 
-            {p.hasNote && (
-              <div style={{ background: '#fdf5e6', border: `1px dashed ${colors.gold}`, borderRadius: 10, padding: '10px 12px', fontSize: 12, color: colors.goldText }}>{p.note}</div>
-            )}
-
             <label>
               <div style={label}>Model</div>
               <input value={p.model} onChange={(e) => p.setModel(e.target.value)} style={{ ...inputStyle, padding: '9px 12px', fontSize: 13.5 }} />
@@ -127,7 +117,7 @@ export default function AISettings() {
                 type="password"
                 value={p.keyInput}
                 onChange={(e) => p.setKeyInput(e.target.value)}
-                placeholder={p.preview || 'Not set'}
+                placeholder={p.hasKey ? '•••••••••••• (set — enter a new key to replace)' : 'Not set'}
                 style={{ ...inputStyle, padding: '9px 12px', fontSize: 13.5 }}
               />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 5 }}>

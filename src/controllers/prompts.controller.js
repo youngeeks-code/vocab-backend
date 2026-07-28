@@ -1,5 +1,6 @@
 const Word = require('../models/Word');
 const Prompt = require('../models/Prompt');
+const Response = require('../models/Response');
 const PromptGuidance = require('../models/PromptGuidance');
 const aiService = require('../services/aiService');
 const { isDue, sortByPriorityThenNeglect } = require('../utils/dueLogic');
@@ -118,11 +119,21 @@ exports.savePrompt = async (req, res, next) => {
   }
 };
 
-// GET /api/prompts  -> history, newest first
+// GET /api/prompts  -> journal, newest first
+// Each entry also carries imageCount — how many image responses it has —
+// so the list view can show a thumbnail-stack indicator without an N+1
+// fetch of every prompt's responses.
 exports.listPrompts = async (req, res, next) => {
   try {
-    const prompts = await Prompt.find().sort({ date: -1 });
-    res.json(prompts);
+    const prompts = await Prompt.find().sort({ date: -1 }).lean();
+
+    const counts = await Response.aggregate([
+      { $match: { promptId: { $in: prompts.map((p) => p._id) }, type: 'image' } },
+      { $group: { _id: '$promptId', count: { $sum: 1 } } },
+    ]);
+    const imageCountByPrompt = new Map(counts.map((c) => [String(c._id), c.count]));
+
+    res.json(prompts.map((p) => ({ ...p, imageCount: imageCountByPrompt.get(String(p._id)) || 0 })));
   } catch (err) {
     next(err);
   }

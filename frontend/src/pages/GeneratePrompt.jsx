@@ -182,7 +182,9 @@ export default function GeneratePrompt() {
         ))}
       </div>
 
-      {error && <div style={{ ...card, borderColor: colors.errorBorder, color: colors.errorText, marginBottom: 20 }}>{error}</div>}
+      {error && mode !== 'ai-app' && (
+        <div style={{ ...card, borderColor: colors.errorBorder, color: colors.errorText, marginBottom: 20 }}>{error}</div>
+      )}
 
       {needsGenerateOptions && (
         <section style={{ ...card, display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
@@ -260,6 +262,15 @@ export default function GeneratePrompt() {
               )}
             </div>
           </div>
+
+          {error && mode === 'ai-app' && (
+            <div style={{ background: colors.errorBg, border: `1px solid ${colors.errorBorder}`, borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+              <div style={{ color: colors.errorText, fontSize: 13.5 }}>{error}</div>
+              <button onClick={() => switchMode('ai-copy')} style={{ flex: 'none', background: colors.accent, color: colors.accentText, padding: '8px 16px', borderRadius: 999, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
+                Switch to Template mode
+              </button>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={generate} disabled={generating} style={{ ...buttonPrimary, alignSelf: 'flex-start' }}>
