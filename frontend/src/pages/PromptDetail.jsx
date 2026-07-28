@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { api } from '../api/client';
-import { colors, headingStyle, card, badge, buttonPrimary, inputStyle, label } from '../theme';
+import { colors, headingStyle, card, badge, buttonPrimary, buttonDanger, inputStyle, label } from '../theme';
 
 function badgeStyle(type) {
   if (type === 'ai') return [colors.errorBg, colors.accent];
@@ -12,6 +12,7 @@ function badgeStyle(type) {
 
 export default function PromptDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [prompt, setPrompt] = useState(null);
   const [responses, setResponses] = useState([]);
   const [responseMode, setResponseMode] = useState('text');
@@ -39,6 +40,16 @@ export default function PromptDetail() {
 
   function toggleWordUsed(wordId) {
     setWordsUsed((prev) => ({ ...prev, [wordId]: !prev[wordId] }));
+  }
+
+  async function deleteEntry() {
+    if (!confirm('Delete this journal entry? This removes its responses too, and un-counts any words it marked as used.')) return;
+    try {
+      await api.del(`/prompts/${id}`);
+      navigate('/history');
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function addResponse() {
@@ -93,6 +104,7 @@ export default function PromptDetail() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '14px 0 20px' }}>
         <div style={{ ...headingStyle, fontSize: 24 }}>{prompt.date}</div>
         <span style={badge(badgeBg, badgeFg)}>{prompt.generatedBy}</span>
+        <button onClick={deleteEntry} style={{ ...buttonDanger, marginLeft: 'auto' }}>Delete entry</button>
       </div>
 
       {error && <div style={{ ...card, borderColor: colors.errorBorder, color: colors.errorText, marginBottom: 20 }}>{error}</div>}

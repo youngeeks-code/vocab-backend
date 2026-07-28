@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { colors, fonts, headingStyle } from '../theme';
+import { api } from '../api/client';
+
+const REPO_URL = 'https://github.com/youngeeks-code/vocab-backend';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/', shape: '50%', iconColor: colors.accent, match: (p) => p === '/' },
@@ -25,6 +29,11 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const { pathname } = useLocation();
+  const [commit, setCommit] = useState(null);
+
+  useEffect(() => {
+    api.get('/health').then((data) => setCommit(data.commit)).catch(() => {});
+  }, []);
 
   return (
     <div
@@ -94,6 +103,17 @@ export default function Sidebar() {
       >
         Sweet consistency beats big pushes. One word a day still counts.
       </div>
+
+      {commit && (
+        <a
+          href={`${REPO_URL}/commit/${commit}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 11, color: colors.textFaint, textAlign: 'center' }}
+        >
+          commit {commit}
+        </a>
+      )}
     </div>
   );
 }

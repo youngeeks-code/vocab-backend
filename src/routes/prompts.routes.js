@@ -10,6 +10,7 @@ router.post('/guidance', ctrl.addGuidance);
 router.get('/', ctrl.listPrompts);
 router.post('/', ctrl.savePrompt);
 router.get('/:id', ctrl.getPrompt);
+router.delete('/:id', ctrl.deletePrompt);
 
 router.post('/:id/response', upload.array('images', 10), responsesCtrl.attachResponse);
 router.get('/:id/response', responsesCtrl.getResponses);

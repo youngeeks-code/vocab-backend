@@ -150,6 +150,49 @@ exports.getPrompt = async (req, res, next) => {
   }
 };
 
+// DELETE /api/prompts/:id
+// Cascades to every Response under this prompt, and reverses the
+// useCount/lastUsed bump attachResponse recorded for each word that was
+// marked "used" on any of those responses — deleting a journal entry
+// undoes its contribution to word-usage stats, not just its text/images.
+exports.deletePrompt = async (req, res, next) => {
+  try {
+    const prompt = await Prompt.findById(req.params.id);
+    if (!prompt) return res.status(404).json({ error: 'Prompt not found' });
+
+    const responses = await Response.find({ promptId: prompt._id });
+    const usedWordIds = [...new Set(responses.flatMap((r) => r.wordsUsed.map(String)))];
+
+    await Response.deleteMany({ promptId: prompt._id });
+    await Prompt.findByIdAndDelete(prompt._id);
+
+    if (usedWordIds.length) {
+      await Word.updateMany({ _id: { $in: usedWordIds } }, { $inc: { useCount: -1 } });
+
+      // lastUsed can't just be cleared — recompute it from whatever responses
+      // remain elsewhere (other journal entries) rather than leaving it
+      // pointing at a use that no longer exists.
+      const remaining = await Response.find({ wordsUsed: { $in: usedWordIds } }).select('wordsUsed createdAt');
+      const lastUsedByWord = new Map();
+      for (const r of remaining) {
+        for (const wordId of r.wordsUsed) {
+          const key = String(wordId);
+          const prev = lastUsedByWord.get(key);
+          if (!prev || r.createdAt > prev) lastUsedByWord.set(key, r.createdAt);
+        }
+      }
+
+      await Promise.all(
+        usedWordIds.map((id) => Word.findByIdAndUpdate(id, { lastUsed: lastUsedByWord.get(id) || null }))
+      );
+    }
+
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+};
+
 // POST /api/prompts/guidance   { note: "please ask me about food" }
 exports.addGuidance = async (req, res, next) => {
   try {

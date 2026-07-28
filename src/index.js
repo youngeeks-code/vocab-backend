@@ -1,7 +1,25 @@
 require('dotenv').config();
+const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const express = require('express');
 const cors = require('cors');
+
+// In Docker, this comes from commit.txt (baked in at build time from whatever
+// was checked out — see the Dockerfile's gitinfo stage). In plain `npm run
+// dev`, there's no commit.txt, so fall back to asking the local .git directly.
+function getCommit() {
+  try {
+    return fs.readFileSync(path.join(__dirname, '..', 'commit.txt'), 'utf8').trim();
+  } catch {
+    try {
+      return execSync('git rev-parse --short HEAD', { cwd: path.join(__dirname, '..') }).toString().trim();
+    } catch {
+      return null;
+    }
+  }
+}
+const COMMIT = getCommit();
 
 const { connectDB } = require('./config/db');
 const { seedPromptTemplates } = require('./config/seedPromptTemplates');
@@ -18,7 +36,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/health', (req, res) => res.json({ ok: true, commit: COMMIT }));
 
 // Serves the built frontend (populated by the Docker build's frontend-build
 // stage; absent in plain `npm run dev`, where Vite's own dev server is used
